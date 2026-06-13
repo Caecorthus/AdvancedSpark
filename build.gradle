@@ -1,0 +1,165 @@
+plugins {
+    id "fabric-loom" version "${loom_version}"
+    id "maven-publish"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    maven {
+        name = "Fabric"
+        url = "https://maven.fabricmc.net/"
+    }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven {
+        name = "Ladysnake"
+        url = "https://maven.ladysnake.org/releases"
+        content {
+            includeGroup "dev.doctor4t"
+            includeGroup "org.ladysnake.cardinal-components-api"
+        }
+    }
+    maven {
+        name = "Datasync"
+        url = "https://maven.uuid.gg/releases"
+        content {
+            includeGroup "dev.upcraft.datasync"
+        }
+    }
+    maven {
+        name = "MaxHenkel"
+        url = "https://maven.maxhenkel.de/repository/public"
+        content {
+            includeGroup "de.maxhenkel.voicechat"
+        }
+    }
+    // English: Ladysnake Maven is preferred; libs is only a local wathe jar fallback.
+    // Chinese: 优先使用 Ladysnake Maven；libs 只作为本地 wathe jar 回退。
+    flatDir {
+        dirs "libs"
+    }
+    mavenCentral()
+}
+
+def watheDependency = "dev.doctor4t:wathe:${project.wathe_version}"
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    modCompileOnly watheDependency
+    modRuntimeOnly watheDependency
+    modCompileOnly "org.ladysnake.cardinal-components-api:cardinal-components-base:${project.cca_version}"
+    modCompileOnly "org.ladysnake.cardinal-components-api:cardinal-components-world:${project.cca_version}"
+    modCompileOnly "org.ladysnake.cardinal-components-api:cardinal-components-entity:${project.cca_version}"
+    modCompileOnly "org.ladysnake.cardinal-components-api:cardinal-components-scoreboard:${project.cca_version}"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.3"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+processResources {
+    // English: OneDrive can turn generated resource outputs into non-regular placeholder files.
+    // Chinese: OneDrive 可能把生成的资源输出变成非普通占位文件。
+    doNotTrackState("Generated resources live under OneDrive and may contain placeholder files")
+    doFirst {
+        delete destinationDir
+    }
+
+    inputs.property "version", project.version
+    inputs.property "minecraft_dependency", project.minecraft_dependency
+    inputs.property "loader_version", project.loader_version
+
+    filesMatching("fabric.mod.json") {
+        expand(
+                version: project.version,
+                minecraft_dependency: project.minecraft_dependency,
+                loader_version: project.loader_version
+        )
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 21
+}
+
+def mirroredTestRuntimeDir = new File(gradle.gradleUserHomeDir, "caches/advancedspark/test-runtime")
+def mirroredProjectClasspathDir = new File(gradle.gradleUserHomeDir, "caches/advancedspark/test-classpath")
+def mirroredTestBinaryResultsDir = new File(gradle.gradleUserHomeDir, "caches/advancedspark/test-binary-results")
+def mirroredTestJunitReportDir = new File(gradle.gradleUserHomeDir, "caches/advancedspark/test-results")
+def mirroredTestHtmlReportDir = new File(gradle.gradleUserHomeDir, "caches/advancedspark/test-report")
+
+// English: Mirror project-local Loom outputs so Gradle test workers survive non-ASCII workspace paths.
+// Chinese: 镜像项目本地的 Loom 输出，避免非 ASCII 工作区路径影响 Gradle 测试进程。
+tasks.register("syncTestRuntime", Sync) {
+    dependsOn tasks.named("testClasses")
+    into mirroredTestRuntimeDir
+    from(sourceSets.main.output) {
+        into "main"
+    }
+    from(sourceSets.test.output) {
+        into "test"
+    }
+}
+
+tasks.register("syncProjectTestClasspath", Sync) {
+    dependsOn tasks.named("compileTestJava")
+    into mirroredProjectClasspathDir
+    from({
+        sourceSets.test.runtimeClasspath.files.findAll { file ->
+            file.isFile() && file.absolutePath.startsWith(projectDir.absolutePath)
+        }
+    }) {
+        into "libs"
+    }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    dependsOn tasks.named("syncTestRuntime")
+    dependsOn tasks.named("syncProjectTestClasspath")
+    testClassesDirs = files(new File(mirroredTestRuntimeDir, "test"))
+    // English: Keep Gradle's binary test results out of OneDrive reparse-point storage.
+    // Chinese: 将 Gradle 二进制测试结果移出 OneDrive 重解析点存储。
+    binaryResultsDirectory = mirroredTestBinaryResultsDir
+    // English: Keep generated test reports out of OneDrive reparse-point storage too.
+    // Chinese: 同样将生成的测试报告移出 OneDrive 重解析点存储。
+    reports.junitXml.outputLocation = mirroredTestJunitReportDir
+    reports.html.outputLocation = mirroredTestHtmlReportDir
+    def externalRuntimeClasspath = sourceSets.test.runtimeClasspath.filter { file ->
+        !file.absolutePath.startsWith(projectDir.absolutePath)
+    }
+    classpath = files(
+            new File(mirroredTestRuntimeDir, "test"),
+            new File(mirroredTestRuntimeDir, "main")
+    ) + fileTree(new File(mirroredProjectClasspathDir, "libs")) + externalRuntimeClasspath
+}
+
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+}

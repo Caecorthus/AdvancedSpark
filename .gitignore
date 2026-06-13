@@ -1,0 +1,10 @@
+.gradle/
+build/
+run/
+out/
+logs/
+*.iml
+/.idea/
+
+# wathe is ARR; keep local dependency jars out of source control.
+libs/*.jar

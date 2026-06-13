@@ -1,0 +1,30 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "io.github.caecorthus.advancedspark.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "GameFunctionsKillBridgeMixin",
+    "GameFunctionsRecordBridgeMixin",
+    "GameFunctionsResetPlayerBridgeMixin",
+    "GameRoundEndComponentRichDataBridgeMixin",
+    "GameRoundEndComponentWinBridgeMixin",
+    "GameWorldComponentRoleBridgeMixin",
+    "KnifeStabPayloadVeteranBridgeMixin",
+    "MurderGameModeNeutralWinBridgeMixin",
+    "MurderGameModeRoleAnnouncementBridgeMixin",
+    "MurderGameModeRoleSelectionBridgeMixin",
+    "MapVariablesWorldComponentSnowflakeBridgeMixin",
+    "PlayerEntityStaminaBridgeMixin",
+    "PlayerMoodComponentTaskBridgeMixin",
+    "PlayerShopComponentPurchaseBridgeMixin",
+    "ScoreboardRoleSelectorComponentForcedRolesBridgeMixin",
+    "SmallDoorBlockBridgeMixin",
+    "TrainDoorBlockBridgeMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
